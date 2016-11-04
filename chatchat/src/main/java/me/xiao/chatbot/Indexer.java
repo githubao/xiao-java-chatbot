@@ -122,8 +122,8 @@ public class Indexer {
 //        String iinFile = classPath + "/me/xiao/chatbot/corpus.txt";
 //        String outPath = classPath + "/me/xiao/chatbot/index/";
 
-        String iinFile = "/mnt/lucene/corpus.txt";
-        String outPath = "/mnt/lucene/index/";
+        String iinFile = ChatConstant.CORPUS_FILE;
+        String outPath = ChatConstant.INDEX_PATH;
 
         train(iinFile, outPath);
     }

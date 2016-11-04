@@ -18,5 +18,7 @@ public class Hello {
         InputStream in = this.getClass().getClassLoader().getResourceAsStream(s);
 //        InputStream in = this.getClass().getResourceAsStream(s);
         System.out.println(in);
+
+        String url = "http://127.0.0.1:8765/?q=monitor";
     }
 }
