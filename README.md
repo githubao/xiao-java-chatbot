@@ -1,2 +1,2 @@
 # xiao-java-chatbot
-impl a tiny chatbot using lucence
+impl a tiny chatbot using lucene
