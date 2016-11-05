@@ -8,14 +8,19 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import org.apache.log4j.Logger;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.AtomicReader;
 import org.apache.lucene.index.AtomicReaderContext;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.PriorityQueue;
+import org.apache.lucene.util.Version;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,10 +52,12 @@ public class Action {
             e.printStackTrace();
             System.exit(-1);
         }
+
+        indexSearcher = new IndexSearcher(reader);
     }
 
-    public static void doServlet(FullHttpRequest request, NettyHttpServletResponse response) throws IOException {
-        ByteBuf buf = null;
+    public static void doServlet(FullHttpRequest request, NettyHttpServletResponse response) throws IOException, ParseException {
+        ByteBuf buf;
         QueryStringDecoder qsd = new QueryStringDecoder(request.uri());
         Map<String, List<String>> mapParameters = qsd.parameters();
         List<String> list = mapParameters.get("q");
@@ -72,8 +79,8 @@ public class Action {
             logger.info("question: " + q);
 
             List<String> clientIps = mapParameters.get("clientIps");
-            String clientIp = "";
-            if (null != clientIp && clientIps.size() == 1) {
+            String clientIp = null;
+            if (null != clientIps && clientIps.size() == 1) {
                 clientIp = clientIps.get(0);
                 logger.info("clientIp: " + clientIp);
             }
@@ -91,7 +98,51 @@ public class Action {
             JSONObject json = new JSONObject();
             TopDocs topDocs = collector.topDocs();
 
+            Analyzer analyzer = new IKAnalyzer(true);
+            QueryParser qp = new QueryParser(Version.LUCENE_4_9, "question", analyzer);
+            if (topDocs.totalHits == 0) {
+                qp.setDefaultOperator(QueryParser.Operator.AND);
+                query = qp.parse(q);
+                logger.info("lucene query: " + query.toString());
+                topDocs = indexSearcher.search(query, 20);
+                logger.info("elapse " + collector.getElapse() + " " + collector.getElapse2());
+            }
+            if (topDocs.totalHits == 0) {
+                qp.setDefaultOperator(QueryParser.Operator.OR);
+                query = qp.parse(q);
+                logger.info("lucene query: " + query.toString());
+                topDocs = indexSearcher.search(query, 20);
+                logger.info("elapse " + collector.getElapse() + " " + collector.getElapse2());
+            }
+
+            json.put("total", topDocs.totalHits);
+            json.put("q", q);
+            JSONArray results = new JSONArray();
+            String firstAns = "";
+            for (ScoreDoc d : topDocs.scoreDocs) {
+                Document doc = indexSearcher.doc(d.doc);
+                String question = doc.get("question");
+                String answer = doc.get("answer");
+                JSONObject item = new JSONObject();
+                if (firstAns.equals("")) {
+                    firstAns = answer;
+                }
+                item.put("answer", answer);
+                item.put("question", question);
+                item.put("doc", d.doc);
+                item.put("score", d.score);
+
+                results.add(item);
+            }
+
+            json.put("result", results);
+            logger.info("response: " + json);
+            logChat.info(String.format("%s [%s] -> [%s]", clientIp, q, firstAns));
+            buf = Unpooled.copiedBuffer(json.toJSONString().getBytes());
+        } else {
+            buf = Unpooled.copiedBuffer("error".getBytes());
         }
+        response.setContent(buf);
 
     }
 
@@ -100,8 +151,8 @@ public class Action {
         protected AtomicReader reader;
         protected int baseDoc;
         protected HashSet<Integer> set = new HashSet<>();
-        protected long elaspse = 0;
-        protected long elaspse2 = 0;
+        protected long elapse = 0;
+        protected long elapse2 = 0;
 
         public MyCollector(PriorityQueue<ScoreDoc> pq) {
             super(pq);
@@ -123,7 +174,7 @@ public class Action {
             String answer = this.getAnswer(doc);
             long t3 = System.currentTimeMillis();
 
-            this.elaspse2 += t3 - t1;
+            this.elapse2 += t3 - t1;
             if (set.contains(answer.hashCode())) {
                 return;
             } else {
@@ -138,7 +189,7 @@ public class Action {
             }
             long t2 = System.currentTimeMillis();
 
-            this.elaspse += t2 - t1;
+            this.elapse += t2 - t1;
 
         }
 
@@ -158,20 +209,12 @@ public class Action {
             return false;
         }
 
-        public long getElaspse() {
-            return elaspse;
+        public long getElapse() {
+            return elapse;
         }
 
-        public void setElaspse(long elaspse) {
-            this.elaspse = elaspse;
-        }
-
-        public long getElaspse2() {
-            return elaspse2;
-        }
-
-        public void setElaspse2(long elaspse2) {
-            this.elaspse2 = elaspse2;
+        public long getElapse2() {
+            return elapse2;
         }
     }
 
