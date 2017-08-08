@@ -1,6 +1,7 @@
 import org.junit.Test;
 
 import java.io.InputStream;
+import java.nio.charset.Charset;
 
 /**
  * 测试文件
@@ -20,5 +21,10 @@ public class Hello {
         System.out.println(in);
 
         String url = "http://127.0.0.1:8765/?q=monitor";
+    }
+
+    @Test
+    public void test2(){
+        System.out.println(Charset.defaultCharset());
     }
 }

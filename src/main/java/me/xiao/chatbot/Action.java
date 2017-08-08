@@ -138,7 +138,7 @@ public class Action {
             json.put("result", results);
             logger.info("response: " + json);
             logChat.info(String.format("%s [%s] -> [%s]", clientIp, q, firstAns));
-            buf = Unpooled.copiedBuffer(json.toJSONString().getBytes());
+            buf = Unpooled.copiedBuffer(json.toJSONString().getBytes("GBK"));
         } else {
             buf = Unpooled.copiedBuffer("error".getBytes());
         }
